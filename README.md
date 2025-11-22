@@ -31,11 +31,7 @@ This workflow makes it easier to:
 
 It reflects how analysts work when the information isn’t perfect: you organize what you have, clean it, quantify it, and look for movement that stands out.
 
----
-
-## Folder Structure
-
-...
+```
 signal_discovery/
 │
 ├── app.py               # Main runner for the pipeline
@@ -53,9 +49,8 @@ signal_discovery/
 ├── examples/            # Sample datasets and demo notebooks
 │
 └── outputs/             # Generated results
-...
-
----
+```
+```
 
 ## Running the Pipeline
 

@@ -35,3 +35,37 @@ It reflects how analysts work when the information isn’t perfect: you organize
 
 ## Folder Structure
 
+...
+signal_discovery/
+│
+├── app.py               # Main runner for the pipeline
+├── diagnostics.py       # Produces readable summaries
+├── requirements.txt
+│
+├── src/                 # Core logic for AIS + market data processing
+│   ├── ingest.py
+│   ├── transforms.py
+│   ├── signals.py
+│   └── utils.py
+│
+├── scripts/             # Helper scripts for data checks and conversions
+│
+├── examples/            # Sample datasets and demo notebooks
+│
+└── outputs/             # Generated results
+...
+
+---
+
+## Running the Pipeline
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+Run the pipeline:
+
+python app.py
+
+
+Outputs are written to the outputs/ folder.

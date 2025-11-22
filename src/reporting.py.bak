@@ -1,0 +1,173 @@
+import sys, pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[0]))
+from __future__ import annotations
+
+import os
+import tempfile
+from typing import List, Dict
+
+import pandas as pd
+import matplotlib
+
+# Use Agg backend for headless environments
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+from fpdf import FPDF
+
+from src.pipeline import run_pipeline
+
+
+def generate_plots(
+    data: pd.DataFrame, op_cols: List[str], market_cols: List[str], output_dir: str
+) -> Dict[str, List[str]]:
+    """Generate line plots for operational and market series."""
+    os.makedirs(output_dir, exist_ok=True)
+    plot_paths: Dict[str, List[str]] = {}
+    for op_col in op_cols:
+        plot_paths[op_col] = []
+        for ticker in market_cols:
+            fig, ax = plt.subplots(figsize=(6, 4), dpi=150)
+            ax.plot(data.index, data[op_col], label=op_col)
+            ax.plot(data.index, data[ticker], label=ticker, alpha=0.7)
+            ax.set_title(f"{op_col} vs {ticker}")
+            ax.set_xlabel("Date")
+            ax.set_ylabel("Value")
+            ax.legend()
+            filename = f"{op_col}_vs_{ticker}.png".replace("/", "_")
+            path = os.path.join(output_dir, filename)
+            fig.tight_layout()
+            fig.savefig(path)
+            plt.close(fig)
+            plot_paths[op_col].append(path)
+    return plot_paths
+
+
+def create_pdf_report(
+    results: List[Dict], plot_paths: Dict[str, List[str]], output_path: str
+) -> None:
+    """Create a simple PDF report summarizing correlation results and plots."""
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    # Title page
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "Signal Discovery Report", ln=True, align="C")
+    pdf.ln(5)
+    pdf.set_font("Arial", size=12)
+    pdf.multi_cell(
+        0,
+        8,
+        "This report summarizes the correlations between operational metrics "
+        "and market instruments over the specified period.  The following pages "
+        "contain time‑series plots and correlation coefficients for each pair.",
+    )
+
+    # Add one page per metric-ticker pair
+    for entry in results:
+        metric = entry["metric"]
+        ticker = entry["ticker"]
+        correlations = entry["correlations"]
+        pdf.add_page()
+        pdf.set_font("Arial", "B", 14)
+        pdf.cell(0, 10, f"{metric} vs {ticker}", ln=True)
+        pdf.set_font("Arial", size=11)
+        for lag, coef in correlations.items():
+            pdf.cell(0, 8, f"Lag {lag}: correlation = {coef:.3f}", ln=True)
+        pdf.ln(5)
+        if metric in plot_paths:
+            for path in plot_paths[metric]:
+                if ticker in os.path.basename(path):
+                    pdf.image(path, w=170)
+                    break
+
+    pdf.output(output_path)
+
+
+def build_streamlit_app() -> None:
+    """Launch a Streamlit app for interactive exploration."""
+    import streamlit as st
+    from datetime import date
+    from .data_ingest import load_operational_data, load_market_data
+
+    st.title("Signal Discovery Pipeline")
+    st.markdown(
+        "Upload one or more operational CSV files with a date column and one or "
+        "more numeric value columns.  Specify the column names, tickers, and date "
+        "range for analysis, then click **Run Analysis** to compute correlations and "
+        "view plots.  You can also download a PDF report."
+    )
+
+    uploaded_files = st.file_uploader(
+        "Operational CSV files", type="csv", accept_multiple_files=True
+    )
+    date_col = st.text_input("Date column name", value="date")
+    value_cols_input = st.text_input(
+        "Value column names (comma separated)", value="value"
+    )
+    tickers_input = st.text_input(
+        "Market tickers (comma separated)", value="SPY"
+    )
+    start_date = st.date_input(
+        "Start date", value=date(2025, 9, 1), min_value=date(2000, 1, 1)
+    )
+    end_date = st.date_input(
+        "End date", value=date(2025, 9, 10), min_value=date(2000, 1, 2)
+    )
+    lags_input = st.text_input("Lags (comma separated integers)", value="0")
+
+    if st.button("Run Analysis"):
+        if not uploaded_files:
+            st.error("Please upload at least one operational CSV file.")
+        else:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                op_paths = []
+                for file in uploaded_files:
+                    file_path = os.path.join(tmpdir, file.name)
+                    with open(file_path, "wb") as f:
+                        f.write(file.getvalue())
+                    op_paths.append(file_path)
+
+                value_cols = [c.strip() for c in value_cols_input.split(",") if c.strip()]
+                tickers = [t.strip() for t in tickers_input.split(",") if t.strip()]
+                lags = [int(l.strip()) for l in lags_input.split(",") if l.strip()]
+
+                try:
+                    results = run_pipeline(
+                        op_files=op_paths,
+                        date_col=date_col,
+                        value_cols=value_cols,
+                        tickers=tickers,
+                        start_date=start_date.strftime("%Y-%m-%d"),
+                        end_date=end_date.strftime("%Y-%m-%d"),
+                        lags=lags,
+                    )
+                except Exception as exc:
+                    st.error(f"Error running pipeline: {exc}")
+                    return
+
+                # Regenerate the joined data for plotting
+                op_df = load_operational_data(op_paths, date_col=date_col, value_cols=value_cols)
+                market_df = load_market_data(tickers, start_date=start_date.strftime("%Y-%m-%d"), end_date=end_date.strftime("%Y-%m-%d"))
+                joined = op_df.join(market_df, how="inner")
+                plot_paths = generate_plots(joined, op_df.columns.tolist(), tickers, output_dir=tmpdir)
+
+                st.subheader("Correlation Results")
+                for entry in results:
+                    st.write(entry)
+
+                st.subheader("Time‑Series Plots")
+                for metric, paths in plot_paths.items():
+                    for p in paths:
+                        st.image(p, caption=os.path.basename(p))
+
+                # Offer PDF download
+                pdf_path = os.path.join(tmpdir, "report.pdf")
+                create_pdf_report(results, plot_paths, pdf_path)
+                with open(pdf_path, "rb") as f:
+                    st.download_button(
+                        label="Download PDF Report",
+                        data=f,
+                        file_name="signal_discovery_report.pdf",
+                        mime="application/pdf",
+                    )

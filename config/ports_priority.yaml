@@ -1,0 +1,32 @@
+priority_ports:
+  us:
+    - Los Angeles / Long Beach
+    - New York / New Jersey
+    - Savannah
+    - Houston
+    - Charleston
+    - Norfolk (Hampton Roads)
+    - Seattle/Tacoma (NWSA)
+    - Oakland
+  ca_mx:
+    - Vancouver
+    - Prince Rupert
+    - Lázaro Cárdenas
+    - Manzanillo
+  asia:
+    - Shanghai
+    - Ningbo-Zhoushan
+    - Shenzhen/Yantian
+    - Qingdao
+    - Tianjin
+    - Busan
+    - Singapore
+    - Kaohsiung
+    - Laem Chabang
+    - Tanjung Pelepas
+    - Port Klang
+    - Ho Chi Minh (Cat Lai)
+  eu:
+    - Rotterdam
+    - Antwerp-Bruges
+    - Hamburg

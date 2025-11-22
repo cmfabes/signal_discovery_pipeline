@@ -1,0 +1,15 @@
+priors:
+  # Asia → US West Coast
+  "Shenzhen/Yantian": 10
+  Shanghai: 10
+  "Ningbo-Zhoushan": 10
+  Busan: 8
+  Singapore: 9
+  "Port Klang": 9
+  "Tanjung Pelepas": 9
+  # US Gateways
+  "Los Angeles / Long Beach": 7
+  "New York / New Jersey": 20
+  Savannah: 18
+  Charleston: 18
+  Norfolk: 18
